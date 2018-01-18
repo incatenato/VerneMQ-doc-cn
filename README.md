@@ -71,6 +71,7 @@ Linux配置文件默认位置为：*/etc/vernemq/vernemq.conf*。
 * 设置 `allow_anonymous = on`。
 * 不要在生产环境打开这个配置。
 
+## Auth using files
 ### 认证配置 (Authentication)
 
 VerneMQ提供了一个简单的基于文件的密码认证机制，默认启用，
@@ -119,5 +120,99 @@ VerneMQ提供了一个简单的基于文件的密码认证机制，默认启用�
 
 `username`
 > 要添加/更新/删除的用户名
+
+### 例子
+
+添加一个用户到一个新的密码文件:(你可以随意命名密码文件，
+它只需要和VerneMQ配置文件中的配置相匹配）。
+
+    vmq-passwd -c /etc/vernemq/vmq.passwd henry
+
+从密码文件中删除用户
+
+    vmq-passwd -D /etc/vernemq/vmq.passwd henry
+
+### ACL授权(Authorization)
+
+VerneMQ 提供简单的基于ACL的授权机制，默认开启。如果不需要可以通过配置禁用：
+
+    plugins.vmq_acl = off
+
+VerneMQ 定期检查指定的ACL文件。
+
+    vmq_acl.acl_file = /etc/vernemq/vmq.acl
+
+检查间隔默认为10秒，也可以在vernemq.conf中定义。
+
+    vmq_acl.acl_reload_interval = 10
+
+设置 `acl_reload_interval = 0`来禁用自动重载。
+
+### 管理ACL条目
+
+使用这种格式来添加topic的访问授权：
+Topic access is added with lines of the format:
+
+    topic [read|write] <topic>
+    
+*注意*：在主题和前一个关键词中间只能有一个空格，额外的空格将会被解释为topic的一部分！
+另外注意，ACL解释器不支持两个条目之间的空行。
+
+access类型使用`read`和`write`进行控制。
+如果为空，则为该topic赋予读和写权限，
+topic可以使用MQTT订阅通配符`+`或`#`
+
+第一个topic适用于所有匿名客户端（allow_anonymous = on），
+用户特定的ACL被添加到如下所示的配置之后。
+
+    user <username>
+    
+也可使用pattern关键字替换topic定义ACL：
+    
+    pattern [read|write] <topic>
+    
+通配符：
+
+> * `%c` 匹配client id
+> * `%u` 匹配用户名
+
+pattern模式是该层级的唯一文本，
+即使使用了`user`关键字添加特定用户，
+使用pattern定义的ACL也对所有用户生效。
+
+*例子*：
+
+    pattern write sensor/%u/data
+    
+警告：如果编辑ACL文件并撤销topic的访问授权，VerneMQ不会取消活动的订阅。
+（需要重启？验证下）
+
+*简单的ACL例子*：
+
+    # ACL for anonymous clients
+    topic bar
+    topic write foo
+    topic read all
+
+
+    # ACL for user 'john'
+    user john
+    topic foo
+    topic read baz
+    topic write all
+  
+匿名用户允许：
+
+* 在topic 'bar' 发布、订阅消息
+* 在topic 'foo' 发布消息
+* 订阅所有topic的消息
+
+用户John允许：
+ 
+* 在topic 'foo' 发布、订阅消息
+* 在topic 'baz' 订阅消息
+* 在所有的topic发布消息
+
+### 使用数据库来做验证和授权
 
 //todo
