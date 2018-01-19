@@ -36,7 +36,8 @@ docker run -e "DOCKER_VERNEMQ_ALLOW_ANONYMOUS=on" --name vernemq1 -d erlio/docke
 ```docker
 docker run -e "DOCKER_VERNEMQ_DISCOVERY_NODE=<IP-OF-VERNEMQ1>" --name vernemq2 -d erlio/docker-vernemq
 ```
-注意：你可以使用 *docker inspect <containername/cid> | grep \"IPAddress\"* 命令查询某个docker容器的ip。
+注意：这里输入节点IP的时候不要加尖括号...
+你可以使用 *docker inspect <containername/cid> | grep \"IPAddress\"* 命令查询某个docker容器的ip。
 
 ### 检查集群状态
 
@@ -208,7 +209,7 @@ pattern模式是该层级的唯一文本，
 * 订阅所有topic的消息
 
 用户John允许：
- 
+
 * 在topic 'foo' 发布、订阅消息
 * 在topic 'baz' 订阅消息
 * 在所有的topic发布消息
