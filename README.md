@@ -216,4 +216,87 @@ pattern模式是该层级的唯一文本，
 
 ### 使用数据库来做验证和授权
 
-//todo
+### Redis
+
+对于Redis认证和授权，请在vernemq.conf中配置以下内容：
+
+    vmq_diversity.auth_redis.enabled = on
+    vmq_diversity.redis.host = 127.0.0.1
+    vmq_diversity.redis.port = 6379
+    # vmq_diversity.redis.password = 
+    # vmq_divserity.redis.database = 0
+    
+使用`redis-cli`脚本或其他软件库可以添加ACL规则，
+`passhash`属性为使用bcrypt加密的客户端密码哈希值，
+redis存储key值是encode过的JSON数组，包含挂载点？和用户名还有客户端ID。
+请注意，数组项之间不允许存在空格。
+
+    SET "[\"\",\"test-client\",\"test-user\"]" "{\"passhash\":
+    \"$2a$12$WDzmynWSMRVzfszQkB2MsOWYQK9qGtfjVpO8iBdimTOjCK/u6CzJK\",
+    \"subscribe_acl\":[{\"pattern\":\"a/+/c\"}]}"
+    
+bcrypt加密版本号支持2a（前缀为‘$2a$’）
+
+
+## MQTT 选项
+
+这里先介绍下Qos等级
+
+    QoS 0 至多发送一次，发送即丢弃。没有确认消息，也不知道对方是否收到。
+    QoS 1 消息至少被传输一次，发布者（客户端/服务器）若因种种异常接收不到PUBACK消息，会再次重新发送PUBLISH消息，同时设置DUP标记为1。接收者以服务器为例，这可能会导致服务器收到重复消息，按照流程，broker（服务器）发布消息到订阅者（会导致订阅者接收到重复消息），然后发送一条PUBACK确认消息到发布者。
+          在业务层面，或许可以弥补MQTT协议的不足之处：重试的消息ID一定要一致接收方一定判断当前接收的消息ID是否已经接受过
+          但一样不能够完全确保，消息一定到达了。
+    Qos 2 确保了仅仅传输接收一次，通信压力稍大些，保证消息到达。
+
+### 重试间隔
+
+设置Qos级别为1和2时消息发送后，VerneMQ未收到响应前重试发送需要等待的时间。
+
+    retry_interval = 20
+    
+这个选项的默认值为20秒。
+
+### Inflight messages
+
+定义可以同时传输QoS等级1或2消息的最大数量。
+
+    max_inflight_messages = 20
+    
+默认20条消息，设置为0表示没有限制，这个设置用来做上行保护。
+
+### Load Shedding
+
+设置队列中在线消息的最大数量，默认为1000，设置为-1标识没有限制。
+该选项通过丢弃（任意QoS等级）消息来保护客户端会话不超过负荷。
+
+    max_online_messages = 1000
+    
+设置Qos等级为1和2离线消息的最大数量：
+   
+    max_offline_messages = 1000
+    
+同上，-1表示没有限制，0表示一条都不会被存储。
+
+`max_inflight_messages`和`max_online/offline_messages`的区别在于，
+前着保护上行，后者保护下行。
+
+## MQTT 监听（Listeners）
+
+监听器指定VerneMQ绑定哪个ip地址和端口，根据选择的传输协议不同必须提供不同的参数。
+VerneMQ允许以分层方式编写监听器配置，非常灵活。VerneMQ的配置文件有一些默认配置，
+如果需要可以重写。
+
+    # defines the default nr of allowed concurrent 
+    # connections per listener
+    listener.max_connections = 10000
+    
+    # defines the nr. of acceptor processes waiting
+    # to concurrently accept new connections
+    listener.nr_of_acceptors = 10
+    
+    # used when clients of a particular listener should
+    # be isolated from clients connected to another 
+    # listener.
+    listener.mountpoint = off
+    
+//TODO
