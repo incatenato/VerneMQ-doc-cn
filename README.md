@@ -403,9 +403,63 @@ VerneMQ同样支持WebSocket协议。想要通过WebSocket连接VerneMQ，需要
 
 ### 控制台日志（console logging）
 
+VerneMQ打印console log的位置：
+
+    log.console = off | file | console | both
+
+VerneMQ默认将日志输出到文件中：
+
+    log.console.file = /path/to/log/file
+
+log文件的默认名称为`console.log`。
+
+console log日志级别：
+
+    log.console.level = debug | info | warning | error
+
 ### 错误日志（error logging）
 
+VerneMQ默认将错误日志输出到文件：
+
+    log.error.file = /path/to/log/file
+
+错误日志文件的默认名称为`error.log`。
+
 ### 系统日志（SysLog）
+
+系统日志开关：
+
+    log.syslog = on
+
+## Consumer Session Balancing
+
+有时消费者会被他们收到的信息数量所淹没。
+VerneMQ可以对订阅同一主题的、使用同一clientId的消费者实例进行负载均衡。
+
+### 开启Session Balancing
+
+在vernemq.conf中配置：
+
+    allow_multiple_sessions = on 
+    queue_deliver_mode = balance
+
+注意：这个设置将在每个节点上激活全局Session Balancing。
+如果希望针对特定的消费者进行Balancing需要安装一个插件。
+如果消费者分布在不同集群节点上，此负载均衡不会生效。
+
+## 管理插件
+
+### Enable a plugin
+ -- 略
+
+### Disable a plugin
+ -- 略
+
+## 共享订阅（share subscriptions）
+
+
+Note: Currently those settings will activate consumer session balancing globally on the respective node. Restricting balancing to specific consumers only, will require a plugin. Note that you cannot balance consumers spread over different cluster nodes.
+
 
 
 
