@@ -256,7 +256,7 @@ bcrypt加密版本号支持2a（前缀为‘$2a$’）
     
 这个选项的默认值为20秒。
 
-### Inflight messages
+### Inflight messages(空中数据)
 
 定义可以同时传输QoS等级1或2消息的最大数量。
 
@@ -283,8 +283,8 @@ bcrypt加密版本号支持2a（前缀为‘$2a$’）
 ## MQTT 监听（Listeners）
 
 监听器指定VerneMQ绑定哪个ip地址和端口，根据选择的传输协议不同必须提供不同的参数。
-VerneMQ允许以分层方式编写监听器配置，非常灵活。VerneMQ的配置文件有一些默认配置，
-如果需要可以重写。
+VerneMQ允许以分层方式编写监听器配置，非常灵活。初始的配置文件有一些默认配置，
+请按自己的需要进行重写。
 
     # defines the default nr of allowed concurrent 
     # connections per listener
@@ -298,5 +298,115 @@ VerneMQ允许以分层方式编写监听器配置，非常灵活。VerneMQ的配
     # be isolated from clients connected to another 
     # listener.
     listener.mountpoint = off
-    
+
+以上是适用于所有传输协议的默认配置，也是仅有的几个与TCP和WebSocket监听器有关的配置。
+
+这些全局配置可以专用在某种传输协议或某个listener上：
+通过override`listener.tcp.CONFIG = VAL`和`listener.tcp.LISTENER.CONFIG = VAL`
+`LISTENER`表示要进一步配置哪个listener。
+
+### 配置例子
+
+TCP监听8883端口，WebSocket监听8888端口：
+
+    listener.tcp.default = 127.0.0.1:1883
+    listener.ws.default = 127.0.0.1:8888
+
+可以使用不同的`name`添加新的监听器。在上面的配置中，`name`为`default`。
+下面示范如何定义一个新的listener，已经限制这个listener的最大连接数。
+
+    listener.tcp.my_other = 127.0.0.1:18884
+    listener.tcp.my_other.max_connections = 100
+
+### PROXY协议
+
+VerneMQ的listener可以配置为接受支持proxy协议的代理服务器的连接。
+这使VerneMQ能够检索源IP /端口等对等信息，而且如果使用代理来做TLS终结，
+则还可以检索TLS客户端证书等详细信息。
+
+通过配置 `listener.tcp.proxy_protocol = on` 或 `listener.tcp.LISTENER.proxy_protocol = on.`
+来为TCP listener启用PROXY协议。
+
+### 配置例子
+
+在8883端口接受SSL连接：
+
+    listener.ssl.cafile = /etc/ssl/cacerts.pem
+    listener.ssl.certfile = /etc/ssl/cert.pem
+    listener.ssl.keyfile = /etc/ssl/key.pem
+
+    listener.ssl.default = 127.0.0.1:8883
+
+打开客户端认证：
+
+    listener.ssl.require_certificate = on
+
+如果您使用客户端证书并且想要使用证书CN值作为用户名，您可以设置：
+
+    listener.ssl.use_identity_as_username = on
+
+`require_certificate` 和 `use_identity_as_username` 这两个选项的默认值都是`off`。
+
+同样的配置可以用来加密WebSocket连接，只需要使用`wss`作为协议标识。
+
+    listener.wss.require_certificate = on
+
+提示：使用SSL时，仍然需要配置身份验证和授权。也就是说，将'allow_anonymous'设置为'off'，然后配置vmq_acl和vmq_passwd或身份验证插件。
+
+## HTTP监听器
+
+跳过
+
+## 非标准MQTT选项
+
+### ClientId 最大长度
+
+设置client id的最大长度，MQTT v3.1指定了23个字符的限制。
+
+    max_client_id_size = 23
+
+此选项默认值为23。
+
+### 过期持久的无效连接
+
+通过设置可以将那些被`clean_session`设置为false的持久客户端（persistent client）如果在特定时间内不reconnect全部删除。
+
+警告：这是一个非标准选项。就MQTT协议而言，持久的客户端永远是持久的。
+
+有效期需要被设置为整数(integer)
+1h（一小时），1d（一天），1w（一周），1m（1个月），1y（1年），never（用不）
+
+    persistent_client_expiration = 1w
+
+此选项默认值为`never`。
+
+### 消息体大小限制
+
+限制VerneMQ允许的最大发布有效payload大小（以字节为单位）。 超过这个大小的信息将被拒绝。
+
+    message_size_limit = 0
+
+此选项默认值为0，表示不限制消息大小。MQTT协议标准的payload大小为268435455字节
+
+## WebSocket
+
+VerneMQ同样支持WebSocket协议。想要通过WebSocket连接VerneMQ，需要在vernemq.conf中配置：
+
+    #普通ws
+    listener.ws.default = 127.0.0.1:8888
+    #或通过ssl
+    listener.wss.default = 127.0.0.1:8889
+
+建立连接时请在ws的url后面添加`/mqtt`路径。
+
+## 日志
+
+### 控制台日志（console logging）
+
+### 错误日志（error logging）
+
+### 系统日志（SysLog）
+
+
+
 //TODO
