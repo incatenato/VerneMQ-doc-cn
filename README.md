@@ -13,7 +13,7 @@ VerneMQ 是一个高性能、分布式的MQTT消息broker。
 ```docker
 docker run --name vernemq1 -d erlio/docker-vernemq
 ```
-你也许需要配置一下端口转发（以MAC为例）：
+配置一下端口转发（MAC为例）：
 ```docker
 docker run -p 1883:1883 --name vernemq1 -d erlio/docker-vernemq
 ```
@@ -27,7 +27,7 @@ docker run -p 1883:1883 --name vernemq1 -d erlio/docker-vernemq
 docker run -e "DOCKER_VERNEMQ_ALLOW_ANONYMOUS=on" --name vernemq1 -d erlio/docker-vernemq
 ```
 
-### 组建*VerneMQ*集群
+### 搭建*VerneMQ*集群
 
 新启动的VerneMQ节点可以通过启动参数自动加入集群。
 如果你已经按照上面的例子启动了第一个名为‘vernemq1’的节点，
