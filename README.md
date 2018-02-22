@@ -431,12 +431,12 @@ VerneMQ默认将错误日志输出到文件：
 
     log.syslog = on
 
-## Consumer Session Balancing
+## 消费者会话负载均衡（Consumer Session Balancing）
 
 有时消费者会被他们收到的信息数量所淹没。
 VerneMQ可以对订阅同一主题的、使用同一clientId的消费者实例进行负载均衡。
 
-### 开启Session Balancing
+### 开启会话负载均衡（Session Balancing）
 
 在vernemq.conf中配置：
 
@@ -457,10 +457,29 @@ VerneMQ可以对订阅同一主题的、使用同一clientId的消费者实例�
 
 ## 共享订阅（share subscriptions）
 
+共享订阅是一种将消息分发给一组共享订阅者的机制。
+这种机制与普通订阅机制的不同是:
+* 共享订阅机制保证每条消息只被一个订阅者接收到。
+* 普通订阅机制每个订阅者都能收到发布消息的副本。
 
-Note: Currently those settings will activate consumer session balancing globally on the respective node. Restricting balancing to specific consumers only, will require a plugin. Note that you cannot balance consumers spread over different cluster nodes.
+共享订阅的topic格式为`$share/sharename/topic`,消息将根据定义的分配策略进行分配。
 
+Tip: 当使用命令行订阅共享topic时，有些命令行shell会将topic的$share关键字扩展为环境变量，请注意。
 
+## 共享订阅配置
 
+共享订阅目前支持三种分发策略：
+* perfer_local：
+    消息优先随机发布给本地客户端，如果不存在则发布给远程客户端。
+* random：
+    消息随机发布给一个客户端。
+* local_only：
+    消息随机发布给本地客户端。
 
-//TODO
+    shared_subscription_policy = prefer_local
+
+### 高级设置
+
+## 隐藏设置
+
+There are a couple of hidden options you can set in the vernemq.conf file. Hidden means that you have to add and set the value explicitly. Hidden options still have default values. Changing them should be considered advanced, possibly with the exception of setting a max_message_rate.
