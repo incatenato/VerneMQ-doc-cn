@@ -476,10 +476,123 @@ Tip: 当使用命令行订阅共享topic时，有些命令行shell会将topic的
 * local_only：
     消息随机发布给本地客户端。
 
-    shared_subscription_policy = prefer_local
+    `shared_subscription_policy = prefer_local`
 
 ## 高级设置
 
 ### 隐藏设置
 
-There are a couple of hidden options you can set in the vernemq.conf file. Hidden means that you have to add and set the value explicitly. Hidden options still have default values. Changing them should be considered advanced, possibly with the exception of setting a max_message_rate.
+vernemq中有一些隐藏设置，这些设置需要手动添加到vernemq.conf中。
+
+### Queue Deliver mode
+
+设置当有多个会话时队列如何传递消息。
+
+* fanout：所有连接的会话都会收到消息。
+* balance：随机选择一个连接的会话。
+
+    queue_deliver_mode = balance
+
+### Queue Type
+
+设置队列如何处理消息。
+* fifo：默认设置，先进先出。
+* lifo：后进先出。
+
+    queue_type = fifo
+
+### 最大消息速率（Max Message Rate）
+
+设置每个会话每秒的最大发布速率。默认值为0表示不限制速率。如果设置为2意味着每个发布者每秒只能发布两条消息。
+
+    max_message_rate = 2
+
+### 设置最大迁移时间（Max Drain Time）
+
+由于订阅者存储的最终一致性，有可能在队列迁移期间仍旧在旧集群节点上驱动消息。 
+使用此参数，可以通过在将队列迁移到其他集群节点之后保持队列一段时间（以秒为单位）。
+
+    max_drain_time = 20
+
+### 设置每个迁移步骤的最大消息数（Max Msgs per Drain Step）
+
+设置每个迁移step允许传递到远程节点的最大消息数。
+较大的值将会加快队列的迁移，但会增加带宽的消耗。
+
+    max_msgs_per_drain_step = 1000
+
+### Default Reg View
+
+这块不太理解。
+允许选择一个新的默认reg_view。reg_view是路由消息的预定义方式。 
+可以加载和使用多个view，但必须选择一个作为默认view。 
+默认路由是`vmq_reg_trie`，即通过内置的trie数据结构进行路由。
+
+    vmq_reg_view = "vmq_reg_trie"
+
+### Reg Views
+
+启动过程中加载的view列表。 它只用于在路由reg_views之间动态选择的插件。
+
+    reg_views = "[vmq_reg_trie]"
+
+### Outgoing Clustering Buffer Size
+
+指定在远程节点不可用的情况下缓冲的字节大小，默认值为10000。整数。
+
+    outgoing_clustering_buffer_size = 15000
+
+## LevelDB
+
+VerneMQ 使用的是Google的LevelDB作为存储消息和订阅者信息的快速存储。每个VerneMQ节点都运行着独立的内嵌的LevelDB。
+
+### Configuration of LevelDB memory
+
+唯一你需要了解的是LevelDB管理着它自己的内存。这意味着VerneMQ不需要为LevelDB分配或释放内存。
+你只需要在vernemq.conf中配置一个值来告诉LevelDB可以使用多少比例的内存。
+
+    leveldb.maximum_memory.percent = 20
+
+## MQTT 桥接（MQTT Bridge）
+
+桥接是一种非标准的方式，尽管将单个broker连接到另一个broker是MQTT中的一种实现标准。
+这种方式允许远程broker的topic树成为本地broker的一部分。
+VerneMQ支持p托尼盖的TCP连接和SSL连接。
+
+### 启用桥接功能
+
+在VerneMQ中，桥接功能是插件的形式，默认是关闭的。配置桥接后，请确认开启了桥接插件。
+
+    plugins.vmq_bridge = on
+
+关于插件的使用，请移步到插件管理（Managing plugins）一节。
+
+### 例子
+
+桥接远程的broker：
+
+    vmq_bridge.tcp.br0 = 192.168.1.12:1883
+
+其他的连接参数：
+
+    # use a clean session (defaults to 'off')
+    vmq_bridge.tcp.br0.cleansession = off | on
+
+    # set the client id (defaults to 'auto', which generates one)
+    vmq_bridge.tcp.br0.client_id = auto | my_bridge_client_id
+
+    # set keepalive interval (defaults to 60 seconds)
+    vmq_bridge.tcp.br0.keepalive_interval = 60
+
+    # set the username and password for the bridge connection
+    vmq_bridge.tcp.br0.username = my_bridge_user
+    vmq_bridge.tcp.br0.password = my_bridge_pwd
+
+    # set the restart timeout (defaults to 10 seconds)
+    vmq_bridge.tcp.br0.restart_timeout = 10
+
+    # VerneMQ indicates other brokers that the connection
+    # is established by a bridge instead of a normal client.
+    # This can be turned off if needed:
+    vmq_bridge.tcp.br0.try_private = off
+
