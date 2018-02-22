@@ -6,7 +6,6 @@ VerneMQ 是一个高性能、分布式的MQTT消息broker。
 ## Docker 安装 VerneMQ
 
 除了作为可以直接安装到操作系统中的软件包，VerneMQ也可以作为Docker镜像使用。
-下面是一个如何使用Docker设置几个VerneMQ节点的例子。
     
 ### 运行一个*VerneMQ*节点
 
@@ -595,4 +594,3 @@ VerneMQ支持p托尼盖的TCP连接和SSL连接。
     # is established by a bridge instead of a normal client.
     # This can be turned off if needed:
     vmq_bridge.tcp.br0.try_private = off
-
