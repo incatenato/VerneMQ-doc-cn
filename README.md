@@ -594,3 +594,129 @@ VerneMQ支持p托尼盖的TCP连接和SSL连接。
     # is established by a bridge instead of a normal client.
     # This can be turned off if needed:
     vmq_bridge.tcp.br0.try_private = off
+
+桥接后远程broker的topic树会被纳入到本地broker的主题树，verneMQ的配置与Mosquitto相似：
+
+    topic [[[ out | in | both ] qos-level] local-prefix remote-prefix]
+
+`topic`定义的topic pattern会在两个broker之间共享，任何与pattern匹配的topic都会被共享。
+第二个参数定义了消息共享的方向：
+
+    in : 导入消息到本地broker
+    out : 导出消息到远程broker
+    both : 两个broker共享消息
+
+如果没有定义这个参数，VerneMQ会默认为`out`。
+Qos-level定义了发布/订阅这个topic的qos等级，默认为0。
+
+local-prefix 和 remote-prefix可为传入或传出的消息添加前缀。
+
+警告： `#`通配符被用于注释，pattern中请用`*`代替。
+
+一个简单的例子：
+
+    # share messages in both directions and use QoS 1
+    vmq_bridge.tcp.br0.topic.1 = /demo/+ both 1
+
+    # import the $SYS tree of the remote broker and
+    # prefix it with the string 'remote'
+    vmq_bridge.tcp.br0.topic.2 = $SYS/* in remote
+
+### 使用 SSL/TLS 桥接的例子
+
+SSL桥接与TCP桥接支持相同的配置参数，但必须添加SSL配置。
+
+    # define the CA certificate file or the path to the
+    # installed CA certificates
+    vmq_bridge.ssl.br0.cafile = cafile.crt
+    #or
+    vmq_bridge.ssl.br0.capath = /path/to/cacerts
+
+    # if the remote broker requires client certificate authentication
+    vmq_bridge.ssl.br0.certfile = /path/to/certfile.pem
+    # and the keyfile
+    vmq_bridge.ssl.br0.keyfile = /path/to/keyfile
+
+    # disable the verification of the remote certificate (defaults to 'off')
+    vmq_bridge.ssl.br0.insecure = off
+
+    # set the used tls version (defaults to 'tlsv1.2')
+    vmq_bridge.ssl.br0.tls_version = tlsv1.2
+
+## 集群
+
+VerneMQ搭建集群很简单，客户端可以连接任一集群节点并从另外的节点接受消息。
+但是，MQTT规范提供了一些在分布式环境中难以满足的保证，特别是在发生网络分区时。
+后面一节会提及到网络分区的情况。
+
+    Set the Cookie! 所以的集群节点都需要配置使用相同的cookie值。
+    可以通过在vernemq.conf设置`distributed_cookie`实现。
+    出于安全原因请将cookies设置为私有值。
+
+    注意：设置恰当的VerneMQ节点名称很重要。 
+    在vernemq.conf中，将nodename = VerneMQ@127.0.0.1更改为适当的值。 
+    确保节点名称在集群内是唯一的。
+    如果涉及防火墙，请阅读VerneMQ节点间通信部分。
+
+### 加入集群
+
+    vmq-admin cluster join discovery-node=<OtherClusterNode>
+
+### 离开集群
+
+    vmq-admin cluster leave node=<NodeThatShouldGo> (这是第一步)
+
+### Case A：活动节点离开集群
+
+活动节点离开集群实际上会做很多工作，节点会花费大部分时间来尝试将其现有的队列迁移到其他节点。
+由于队列是VerneMQ的实时进程，他只会在队列迁移完成后才会退出。
+
+让我们来看看实际的步骤：
+
+    1. vmq-admin cluster leave node=<NodeThatShouldGo>
+
+第一步将会停止MQTT监听器来确保不会在有新的客户端连接进来，这时不会中断现有连接。
+后台的节点也暂时不会离开集群。已连接的客户端仍然可以发布和接收消息。
+
+然后给出一个宽限期（时间长短取决于您），等待现有的客户端re-connect到其他节点。
+如果您认为这个宽限期可以结束，执行第二步：断开其他客户端。
+
+    2. vmq-admin cluster leave node=<NodeThatShouldGo> -k
+
+`-k`将删除节点的MQTT监听器，并取消所有活动连接。 如果你一开始就想这么做，可以把这当做第一步。
+
+现在，队列迁移由客户端重新连接到其他节点触发。他们会要求他们的队列来做迁移。
+不过在离开节点上可能还存在部分离线队列。因为它们是预先存在的，或者某些客户端不重新连接，并且不回收它们的队列。
+
+超过配置的超时时间后，如果有剩余的脱机队列，VerneMQ会抛出一个异常。默认超时时间是60秒，可以在leave集群时设置。
+当有异常显示在控制台或console.log时，请重试命令（包括设置迁移超时（-t），打印到console.log的迁移进度信息的频率（秒）(-i)）：
+
+    3. vmq-admin cluster leave node=<NodeThatShouldGo> -k -i 5 -t 120
+
+这步结束后，VerneMQ会使用轮询的方式强行将剩余的离线队列迁移到其他的集群节点。
+此流程到此全部结束。
+
+注1：在进行cluster leaving时，使用console.log来查看队列迁移进度。
+
+注2：如果您想重新加入集群或将节点重新启动为单个节点，需要备份＆重命名/删除整个VerneMQ数据目录并创建一个新目录。 （它将由VerneMQ自动创建）。
+
+### Case B：已停止节点离开集群
+
+Case A是可控的情况。 您以受控的方式使节点离开集群，并且一切正常，包括将完整的队列（和消息）传输到其他节点。
+
+我们来看看节点已经关闭的第二种可能性。 你的集群仍然依赖它，关闭的节点会阻止新的订阅，所以你想让这个坏节点离开集群。
+
+请使用与Case A相同的命令。 这会造成一个比较重要的后果：使停止的节点离开会丢弃持久队列内容，因为VerneMQ无法迁移或传递它，请三思。
+
+重要的事情再说一遍：
+
+    Case B的危险性：持久化的QoS 1和QoS 2消息不会被复制到其他节点，所以会丢失此节点的离线消息。
+
+### 获取集群状态信息
+
+    vmq-admin cluster show
+
+## Inter-node Communication
+
+## Dealing with Netsplits
+
