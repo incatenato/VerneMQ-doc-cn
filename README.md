@@ -760,7 +760,7 @@ VerneMQ在这种情况下无法传递消息。 将保留的消息传递给远程
 
 ### 重复客户端可能的情况（Possible Scenario for Duplicate Clients）：
 
-通常情况下，客户端注册使用给定的clientID与leader节点进行同步。 
+通常情况下，客户端使用给定的clientID注册后与leader节点进行同步。 
 这种同步消除了多个客户端尝试与不同节点上的相同客户端ID进行连接之间的竞争情况。 
 但是，在Window of Uncertainty期间，VerneMQ可能无法断开连接到不同节点的客户端。 
 虽然这种情况听起来像是人为造成的，但最终可能会出现连接到集群的重复客户端。
