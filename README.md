@@ -716,7 +716,190 @@ Case A是可控的情况。 您以受控的方式使节点离开集群，并且�
 
     vmq-admin cluster show
 
-## Inter-node Communication
+## 内部节点通讯
 
-## Dealing with Netsplits
+VerneMQ使用Erlang分布式机制来实现节点间通信。 VerneMQ使用标识符标识集群中的节点（例如VerneMQ@10.9.8.7）。 Erlang通过每个集群节点上运行的Erlang端口映射守护程序（epmd）来解析节点的地址。
+
+默认情况下，epmd绑定到TCP端口4369并监听通配符接口。对于节点间通信，Erlang默认绑定到端口0。
+
+为了便于防火墙配置，VerneMQ可以为Erlang配置限制范围的端口号。
+例如，要将Erlang节点间通信的端口范围限制在6000-7999，在vernemq.conf中添加如下配置：
+
+    erlang.distribution.port_range.minimum = 6000
+    erlang.distribution.port_range.maximum = 7999
+
+以上设置仅用于分发订阅更新和保留消息。
+想要分发`真实`MQTT消息，必须在vernemq.conf中配置`vmq`选项。
+
+    listener.vmq.clustering = 0.0.0.0:44053
+
+## 处理网络分割（Dealing with Netsplits）
+
+本节阐述VerneMQ如何处理网络分区（又名netsplit或脑裂情况）。
+netsplit是指一个或多个网络设备故障导致的集群中的节点瘫痪。
+
+VerneMQ能够检测到网络分区，检测到后默认情况下它不会再响应CONNECT，PUBLISH，SUBSCRIBE，UNSUBSCRIBE请求。
+然后客户端会不停的重发unacked命令并且消息不会被丢弃（Qos为0的消息会丢弃）。
+但是，可能会出现time window（发生网络分区和VerneMQ检测到网络分区的时间间隙），而且这个time window在每个集群节点上都不一样。
+在本指南中我们将此time window称为Window of Uncertainty。
+
+注意：从VerneMQ 0.15.1开始，netsplit期间的行为可以通过`allow_register_during_netsplit`，`allow_publish_during_netsplit`，`allow_subscribe_during_netsplit`和`allow_unsubscribe_during_netsplit`配置。 
+这些选项取代`trade_consistency`选项。 为了达到与`trade_consistency=on`相同的行为，所有提到的netsplit选项必须设置为`on`。 
+在0.15.1之前的VerneMQ版本需要设置`allow_multiple_sessions = on`参数，以允许在netsplit期间建立新的客户端连接。 
+这在之后的版本中是不需要配置的。 仍然可以使用`allow_multiple_sessions`，但是在netsplit情况下不再影响服务新客户端。
+
+### 消息丢失的可能情况（Possible Scenario for Message Loss）：
+
+VerneMQ遵循最终一致的模型来存储和复制订阅数据。 这还包括保留的消息。
+
+基于最终一致的数据模型，有可能在Window of Uncertainty（见上文）期间，publish不会考虑到远程节点（在另一个分区中）的subscription。
+VerneMQ在这种情况下无法传递消息。 将保留的消息传递给远程用户也是如此。
+
+在Window of Uncertainty期间遗愿（last will messages）消息会被触发并传送给可到达的订阅者。 
+在netsplit期间、Window of Uncertainty之后，遗愿消息将被丢弃。
+
+### 重复客户端可能的情况（Possible Scenario for Duplicate Clients）：
+
+通常情况下，客户端注册使用给定的clientID与leader节点进行同步。 
+这种同步消除了多个客户端尝试与不同节点上的相同客户端ID进行连接之间的竞争情况。 
+但是，在Window of Uncertainty期间，VerneMQ可能无法断开连接到不同节点的客户端。 
+虽然这种情况听起来像是人为造成的，但最终可能会出现连接到集群的重复客户端。
+
+### 从Netsplit中恢复（Recovering from a Netsplit）：
+
+只要分区修复并重新建立连接，VerneMQ节点就会复制对订阅数据所做的最新更改。
+这包括“Window of Uncertainty”期间“偶然”做出的所有更改。 使用[Dotted Version Vectors VerneMQ](https://github.com/ricardobcl/Dotted-Version-Vectors)保证订阅数据和保留消息最终一致。
+
+修复重复客户端的问题在0.14.2版本已被修复。
+
+## 监控
+
+VerneMQ可以通过多种方式进行监控：
+
+[Graphite](https://graphiteapp.org/)
+MQTT $SYS tree
+[Prometheus](https://prometheus.io/)
+
+这些监控指标可以通过命令行工具获得：
+
+    vmq-admin metrics show
+
+### 输出指标（Exported Metrics）：
+
+VerneMQ指标包括计数器（counters）和量表（gauges）。 
+计数器报告自上次重置以来的事件总数。 
+量表报告该时间点的数值。 
+使用命令行工具重置计数器：
+
+    vmq-admin metrics reset
+
+Available Counters：
+
+    # Networking
+    socket_open 
+    socket_close 
+    socket_error 
+    bytes_received 
+    bytes_sent 
+
+    # Inter-node messages, only includes the distribution of MQTT messages
+    cluster_bytes_received 
+    cluster_bytes_sent 
+    cluster_bytes_dropped 
+
+    # MQTT message stats
+    mqtt_connect_received 
+    mqtt_publish_received 
+    mqtt_puback_received 
+    mqtt_pubrec_received
+    mqtt_pubrel_received 
+    mqtt_pubcomp_received 
+    mqtt_subscribe_received 
+    mqtt_unsubscribe_received 
+    mqtt_pingreq_received 
+    mqtt_disconnect_received 
+    mqtt_publish_sent 
+    mqtt_puback_sent 
+    mqtt_pubrec_sent 
+    mqtt_pubrel_sent 
+    mqtt_pubcomp_sent
+    mqtt_suback_sent 
+    mqtt_unsuback_sent 
+    mqtt_pingresp_sent 
+
+    # Authentication stats
+    mqtt_connack_accepted_sent
+    mqtt_connack_unacceptable_protocol_sent
+    mqtt_connack_identifier_rejected_sent
+    mqtt_connack_server_unavailable_sent
+    mqtt_connack_bad_credentials_sent
+    mqtt_connack_not_authorized_sent
+
+    # Authorization error
+    mqtt_publish_auth_error 
+    mqtt_subscribe_auth_error 
+
+    # MQTT stack errors
+    mqtt_publish_invalid_msg_size_error 
+    mqtt_puback_invalid_error 
+    mqtt_pubrec_invalid_error 
+    mqtt_pubcomp_invalid_error 
+    mqtt_connect_error 
+    mqtt_publish_error
+    mqtt_subscribe_error 
+    mqtt_unsubscribe_error 
+
+    # MQTT queue stats
+    queue_setup 
+    queue_teardown 
+    queue_message_drop 
+    queue_message_unhandled 
+    queue_message_in 
+    queue_message_out 
+
+    # MQTT Misc
+    client_expired 
+
+    # System Counters
+    system_wallclock
+    system_runtime
+    system_reductions 
+    system_io_out 
+    system_io_in 
+    system_words_reclaimed_by_gc 
+    system_gc_count 
+    system_exact_reductions 
+    system_context_switches
+
+Available Gauges：
+
+    # MQTT Queues
+    queue_processes
+
+    # Retain Cache
+    retain_memory
+    retain_messages
+
+    # Routing Tables
+    router_memory
+    router_topics
+    router_subscriptions
+
+    # System Stats
+    system_utilization_scheduler_[1..n]
+    system_utilization
+    system_run_queue
+
+    # VM Memory
+    vm_memory_ets
+    vm_memory_code
+    vm_memory_binary
+    vm_memory_atom_used
+    vm_memory_atom
+    vm_memory_system
+    vm_memory_processes_used
+    vm_memory_processes
+    vm_memory_total
+
+
 
