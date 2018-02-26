@@ -776,9 +776,9 @@ VerneMQ在这种情况下无法传递消息。 将保留的消息传递给远程
 
 VerneMQ可以通过多种方式进行监控：
 
-[Graphite](https://graphiteapp.org/)
-MQTT $SYS tree
-[Prometheus](https://prometheus.io/)
+* [Graphite](https://graphiteapp.org/)
+* MQTT $SYS tree
+* [Prometheus](https://prometheus.io/)
 
 这些监控指标可以通过命令行工具获得：
 
