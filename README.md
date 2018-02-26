@@ -770,7 +770,7 @@ VerneMQ在这种情况下无法传递消息。 将保留的消息传递给远程
 只要分区修复并重新建立连接，VerneMQ节点就会复制对订阅数据所做的最新更改。
 这包括“Window of Uncertainty”期间“偶然”做出的所有更改。 使用[Dotted Version Vectors VerneMQ](https://github.com/ricardobcl/Dotted-Version-Vectors)保证订阅数据和保留消息最终一致。
 
-修复重复客户端的问题在0.14.2版本已被修复。
+重复客户端的问题在0.14.2版本已被修复。
 
 ## 监控
 
